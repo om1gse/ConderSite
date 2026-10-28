@@ -353,6 +353,10 @@ svg { fill: currentColor; }
 .calc__card input:focus, .contact-form input:focus, .contact-form select:focus, .contact-form textarea:focus {
   border-color: var(--green-600); background: var(--white); box-shadow: 0 0 0 3px rgba(60, 116, 44, .15);
 }
+/* тънкият I-beam курсор на Windows почти не се вижда върху светлите числови полета */
+.calc__card, .calc__card label, .calc__result { cursor: default; }
+.calc__card input[type=number] { cursor: pointer; }
+.calc__card input[type=number]:focus { cursor: text; }
 .calc__card label.toggle { flex-direction: row; align-items: center; gap: 12px; font-weight: 600; font-size: 14px; cursor: pointer; }
 .toggle input { position: absolute; opacity: 0; pointer-events: none; }
 .toggle span { width: 44px; height: 26px; border-radius: 999px; background: var(--line); position: relative; flex-shrink: 0; transition: background .2s; }
