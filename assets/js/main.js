@@ -43,10 +43,37 @@
   }
 
   /* ---------- Catalog ---------- */
-  var state = { type: "", btu: "", q: "", sort: "default" };
+  var PAGE = 12;
+  var state = { type: "", brand: "", btu: "", q: "", sort: "default", limit: PAGE };
   var grid = $("#productsGrid");
   var empty = $("#productsEmpty");
   var chips = $("#typeChips");
+  var moreBtn = $("#showMore");
+  var countEl = $("#productsCount");
+
+  // „Препоръчани“: редуваме марките, за да не започва списъкът с една марка
+  var recommended = (function () {
+    var byBrand = {}, order = [];
+    DATA.products.forEach(function (p) {
+      if (!byBrand[p.brand]) { byBrand[p.brand] = []; order.push(p.brand); }
+      byBrand[p.brand].push(p);
+    });
+    var out = [];
+    while (out.length < DATA.products.length) {
+      order.forEach(function (b) { if (byBrand[b].length) out.push(byBrand[b].shift()); });
+    }
+    return out;
+  })();
+
+  function fillSelect(el, values, label) {
+    if (!el) return;
+    el.innerHTML += values.map(function (v) {
+      return '<option value="' + esc(v) + '">' + esc(label ? label(v) : v) + "</option>";
+    }).join("");
+  }
+  var uniq = function (arr) { return arr.filter(function (v, i) { return arr.indexOf(v) === i; }); };
+  fillSelect($("#brandFilter"), uniq(DATA.products.map(function (p) { return p.brand; })).sort());
+  fillSelect($("#btuFilter"), uniq(DATA.products.map(function (p) { return p.btu; })).sort(function (a, b) { return a - b; }), fmtBtu);
 
   var usedTypes = DATA.products.reduce(function (acc, p) {
     if (acc.indexOf(p.type) < 0) acc.push(p.type);
@@ -65,6 +92,7 @@
       chips.querySelectorAll(".chip").forEach(function (c) { c.classList.remove("is-active"); });
       b.classList.add("is-active");
       state.type = b.dataset.type;
+      state.limit = PAGE;
       renderProducts();
     });
   }
@@ -73,7 +101,8 @@
     var k = b.toLowerCase();
     if (k.indexOf("промо") > -1) return "badge--red";
     if (k.indexOf("монтаж") > -1) return "badge--green";
-    if (k.indexOf("ново") > -1) return "badge--blue";
+    if (k.indexOf("ново") > -1 || k.indexOf("хипер") > -1) return "badge--blue";
+    if (k.indexOf("a+++") > -1) return "badge--green";
     return "badge--gold";
   }
 
@@ -120,8 +149,9 @@
   function renderProducts() {
     if (!grid) return;
     var q = state.q.trim().toLowerCase();
-    var list = DATA.products.filter(function (p) {
+    var list = recommended.filter(function (p) {
       if (state.type && p.type !== state.type) return false;
+      if (state.brand && p.brand !== state.brand) return false;
       if (state.btu && String(p.btu) !== state.btu) return false;
       if (q && (p.brand + " " + p.name).toLowerCase().indexOf(q) < 0) return false;
       return true;
@@ -131,14 +161,22 @@
     if (state.sort === "price-desc") list.sort(function (a, b) { return (b.price || 0) - (a.price || 0); });
     if (state.sort === "btu") list.sort(function (a, b) { return a.btu - b.btu; });
 
-    grid.innerHTML = list.map(productCard).join("");
+    grid.innerHTML = list.slice(0, state.limit).map(productCard).join("");
     empty.hidden = list.length > 0;
+    moreBtn.hidden = list.length <= state.limit;
+    moreBtn.textContent = "Покажи още (" + (list.length - state.limit) + ")";
+    countEl.textContent = list.length ? "Намерени модели: " + list.length : "";
   }
 
-  var searchEl = $("#search"), btuEl = $("#btuFilter"), sortEl = $("#sort");
-  if (searchEl) searchEl.addEventListener("input", function () { state.q = searchEl.value; renderProducts(); });
-  if (btuEl) btuEl.addEventListener("change", function () { state.btu = btuEl.value; renderProducts(); });
-  if (sortEl) sortEl.addEventListener("change", function () { state.sort = sortEl.value; renderProducts(); });
+  var searchEl = $("#search"), btuEl = $("#btuFilter"), sortEl = $("#sort"), brandEl = $("#brandFilter");
+  var onFilter = function (key, el, ev) {
+    if (el) el.addEventListener(ev, function () { state[key] = el.value; state.limit = PAGE; renderProducts(); });
+  };
+  onFilter("q", searchEl, "input");
+  onFilter("btu", btuEl, "change");
+  onFilter("brand", brandEl, "change");
+  onFilter("sort", sortEl, "change");
+  if (moreBtn) moreBtn.addEventListener("click", function () { state.limit += PAGE; renderProducts(); });
   renderProducts();
 
   /* ---------- Product modal ---------- */
@@ -165,6 +203,7 @@
           "<tr><th>Енергиен клас</th><td>" + esc(p.energy) + "</td></tr>" +
           "<tr><th>Wi-Fi управление</th><td>" + (p.wifi ? "Да" : "Не") + "</td></tr>" +
         "</table>" +
+        (p.description ? '<p class="modal__desc">' + esc(p.description) + "</p>" : "") +
         (feats ? '<ul class="checklist">' + feats + "</ul>" : "") +
         '<div class="modal__price">' + price + "</div>" +
         '<div class="form-actions">' +
@@ -187,7 +226,7 @@
   /* ---------- Calculator ---------- */
   var cLen = $("#cLen"), cWid = $("#cWid"), cHei = $("#cHei"), cSun = $("#cSun"), cPeople = $("#cPeople");
   var STANDARD = [9000, 12000, 18000, 24000];
-  var recommended = 9000;
+  var recBtu = 9000;
 
   function calc() {
     if (!cLen) return;
@@ -197,9 +236,9 @@
     if (cSun.checked) watts *= 1.15;
     if (cPeople.checked) watts *= 1.1;
     var btu = watts * 3.412;
-    recommended = STANDARD.filter(function (s) { return s >= btu; })[0] || 0;
+    recBtu = STANDARD.filter(function (s) { return s >= btu; })[0] || 0;
     $("#rArea").textContent = (Math.round(area * 10) / 10).toLocaleString("bg-BG") + " м²";
-    $("#rBtu").textContent = recommended ? fmtBtu(recommended) : "над 24 000 BTU";
+    $("#rBtu").textContent = recBtu ? fmtBtu(recBtu) : "над 24 000 BTU";
   }
   ["input", "change"].forEach(function (ev) {
     var f = $("#calcForm");
@@ -209,8 +248,9 @@
 
   var calcShow = $("#calcShow");
   if (calcShow) calcShow.addEventListener("click", function () {
-    state.btu = recommended ? String(recommended) : "";
+    state.btu = recBtu ? String(recBtu) : "";
     btuEl.value = state.btu;
+    state.limit = PAGE;
     renderProducts();
     $("#catalog").scrollIntoView({ behavior: "smooth" });
   });

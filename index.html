@@ -173,12 +173,13 @@
             <input type="search" id="search" placeholder="Търсене по марка или модел" aria-label="Търсене">
           </label>
           <label class="field">
+            <select id="brandFilter" aria-label="Марка">
+              <option value="">Всички марки</option>
+            </select>
+          </label>
+          <label class="field">
             <select id="btuFilter" aria-label="Мощност">
               <option value="">Всяка мощност</option>
-              <option value="9000">9 000 BTU</option>
-              <option value="12000">12 000 BTU</option>
-              <option value="18000">18 000 BTU</option>
-              <option value="24000">24 000 BTU</option>
             </select>
           </label>
           <label class="field">
@@ -192,7 +193,11 @@
         </div>
       </div>
 
+      <p class="products__count" id="productsCount" aria-live="polite"></p>
       <div class="products" id="productsGrid"><!-- рендерира се от assets/js/data.js --></div>
+      <div class="products__more">
+        <button class="btn btn--outline btn--lg" id="showMore" hidden>Покажи още</button>
+      </div>
       <p class="products__empty" id="productsEmpty" hidden>Няма намерени модели по тези критерии. <a href="#contacts">Попитайте ни</a> – ще намерим подходящ.</p>
     </div>
   </section>

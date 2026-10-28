@@ -23,7 +23,7 @@ assets/img/           – логотип, флаер; сюда же кладит
   id: "daikin-ftxm25",                 // уникальный id
   brand: "Daikin",
   name: "Perfera FTXM25R",
-  type: "wall",                        // wall | multi | floor | cassette
+  type: "wall",                        // wall | floor | multi | cassette | duct | column | mobile
   btu: 9000,
   area: "до 25 м²",
   energy: "A+++",
@@ -32,9 +32,12 @@ assets/img/           – логотип, флаер; сюда же кладит
   oldPrice: 999,                       // null, если нет акции
   image: "assets/img/products/daikin-ftxm25.jpg",  // "" → иконка-заглушка
   badges: ["Промо", "Безплатен монтаж"],
+  description: "Текст описания для окна «Детайли»",
   features: ["Тих режим 19 dB", "Wi-Fi управление"]
 }
 ```
+
+Сейчас в каталоге 100 моделей (стенные, напольные, мультисплит, кассетные, канальные, колонные, мобильные). Фото — в `assets/img/products/<id>.webp`.
 
 Цвет бейджа выбирается автоматически: «Промо» — красный, «…монтаж» — зелёный, «Ново» — синий, остальные — золотые.
 
