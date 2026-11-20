@@ -1,18 +1,59 @@
 (function () {
   "use strict";
 
-  var DATA = window.SITE_DATA || { services: [], products: [], towns: [], productTypes: {} };
+  var DATA = window.SITE_DATA || { services: [], products: [], towns: [], gallery: [] };
+  var I18N = window.I18N;
   var PHONE_WA = "359886086029";
   var EMAIL = "ndelitklima@gmail.com";
+  var PAGE = 12;
 
   var $ = function (sel, ctx) { return (ctx || document).querySelector(sel); };
+  var $$ = function (sel, ctx) { return Array.prototype.slice.call((ctx || document).querySelectorAll(sel)); };
   var esc = function (s) {
     return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
     });
   };
+  var store = {
+    get: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set: function (k, v) { try { localStorage.setItem(k, v); } catch (e) { /* private mode */ } }
+  };
+
+  /* ---------- Language ---------- */
+  var lang = (function () {
+    var q = (location.search.match(/[?&]lang=(bg|en|ru)\b/) || [])[1];
+    var s = store.get("lang");
+    return q || (I18N.langs.indexOf(s) > -1 ? s : "bg");
+  })();
+  var t = function (key) { var e = I18N.T[key]; return e ? (e[lang] || e.bg) : key; };
+  var L = function (v) { return v && typeof v === "object" ? (v[lang] || v.bg || "") : (v || ""); };
   var fmtBtu = function (n) { return Number(n).toLocaleString("bg-BG").replace(/\s/g, " ") + " BTU"; };
-  var fmtPrice = function (n) { return Number(n).toLocaleString("bg-BG", { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + " €"; };
+  var fmtPrice = function (n) { return Number(n).toLocaleString("bg-BG", { maximumFractionDigits: 2 }).replace(/\s/g, " ") + " €"; };
+  var areaText = function (p) { return typeof p.area === "number" ? t("unit.area").replace("{n}", p.area) : L(p.area); };
+
+  function applyStatic() {
+    document.documentElement.lang = lang;
+    $$("[data-i18n]").forEach(function (el) { el.innerHTML = t(el.getAttribute("data-i18n")); });
+    $$("[data-i18n-ph]").forEach(function (el) { el.placeholder = t(el.getAttribute("data-i18n-ph")); });
+    $$("[data-i18n-aria]").forEach(function (el) { el.setAttribute("aria-label", t(el.getAttribute("data-i18n-aria"))); });
+    $$(".lang__btn").forEach(function (b) {
+      var on = b.dataset.lang === lang;
+      b.classList.toggle("is-active", on);
+      b.setAttribute("aria-pressed", String(on));
+    });
+    var wa = $("#hotelsWa");
+    if (wa) wa.href = "https://wa.me/" + PHONE_WA + "?text=" + encodeURIComponent(t("hotels.waText"));
+  }
+
+  function setLang(l) {
+    lang = l;
+    store.set("lang", l);
+    applyStatic();
+    renderAll();
+  }
+  $$(".lang__btn").forEach(function (b) {
+    b.addEventListener("click", function () { if (b.dataset.lang !== lang) setLang(b.dataset.lang); });
+  });
 
   /* ---------- Icons ---------- */
   var ICONS = {
@@ -22,131 +63,122 @@
     freon: '<path d="M12 2s-7 7.6-7 12.5a7 7 0 0 0 14 0C19 9.6 12 2 12 2zm0 17.5a4.5 4.5 0 0 1-4.5-4.5h2a2.5 2.5 0 0 0 2.5 2.5z"/>',
     remove: '<path d="M3 6h18v2H3zm2 3h14l-1.2 12.1a1 1 0 0 1-1 .9H7.2a1 1 0 0 1-1-.9zm4-7h6l1 2H8z"/>',
     hotel: '<path d="M7 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm12-6h-8v7H3V5H1v15h2v-3h18v3h2v-9a4 4 0 0 0-4-4z"/>',
-    snow: '<path d="M11 2h2v4.2l2.6-2.6 1.4 1.4-4 4V11h2l4-4 1.4 1.4-2.6 2.6H22v2h-4.2l2.6 2.6L19 17l-4-4h-2v2l4 4-1.4 1.4-2.6-2.6V22h-2v-4.2l-2.6 2.6L7 19l4-4v-2H9l-4 4-1.4-1.4L6.2 13H2v-2h4.2L3.6 8.4 5 7l4 4h2V9L7 5l1.4-1.4L11 6.2z"/>'
+    snow: '<path d="M11 2h2v4.2l2.6-2.6 1.4 1.4-4 4V11h2l4-4 1.4 1.4-2.6 2.6H22v2h-4.2l2.6 2.6L19 17l-4-4h-2v2l4 4-1.4 1.4-2.6-2.6V22h-2v-4.2l-2.6 2.6L7 19l4-4v-2H9l-4 4-1.4-1.4L6.2 13H2v-2h4.2L3.6 8.4 5 7l4 4h2V9L7 5l1.4-1.4L11 6.2z"/>',
+    zoom: '<path d="M10 2a8 8 0 0 1 6.3 12.9l5.4 5.4-1.4 1.4-5.4-5.4A8 8 0 1 1 10 2zm0 2a6 6 0 1 0 0 12 6 6 0 0 0 0-12zm-1 2h2v3h3v2h-3v3H9v-3H6V9h3z"/>'
   };
-  var svg = function (name) {
-    return '<svg viewBox="0 0 24 24" aria-hidden="true">' + (ICONS[name] || ICONS.snow) + "</svg>";
-  };
+  var svg = function (name) { return '<svg viewBox="0 0 24 24" aria-hidden="true">' + (ICONS[name] || ICONS.snow) + "</svg>"; };
 
   /* ---------- Services ---------- */
-  var servicesGrid = $("#servicesGrid");
-  if (servicesGrid) {
-    servicesGrid.innerHTML = DATA.services.map(function (s) {
-      return '<article class="service reveal">' +
+  function renderServices() {
+    var grid = $("#servicesGrid");
+    if (!grid) return;
+    grid.innerHTML = DATA.services.map(function (s) {
+      return '<article class="service reveal is-visible">' +
         '<div class="service__ico">' + svg(s.icon) + "</div>" +
-        "<h3>" + esc(s.title) + "</h3>" +
-        "<p>" + esc(s.text) + "</p>" +
-        '<div class="service__foot"><span class="service__price">' + esc(s.price) + "</span>" +
-        '<a href="#contacts" class="service__link" data-service="' + esc(s.title) + '">Заявка &rarr;</a></div>' +
+        "<h3>" + esc(L(s.title)) + "</h3>" +
+        "<p>" + esc(L(s.text)) + "</p>" +
+        '<div class="service__foot"><span class="service__price">' + esc(L(s.price)) + "</span>" +
+        '<button type="button" class="service__link" data-lead="consult" data-model="' + esc(L(s.title)) + '">' + t("services.request") + " &rarr;</button></div>" +
         "</article>";
     }).join("");
   }
 
   /* ---------- Catalog ---------- */
-  var PAGE = 12;
   var state = { type: "", brand: "", btu: "", q: "", sort: "default", limit: PAGE };
-  var grid = $("#productsGrid");
-  var empty = $("#productsEmpty");
-  var chips = $("#typeChips");
-  var moreBtn = $("#showMore");
-  var countEl = $("#productsCount");
+  var byId = {};
+  DATA.products.forEach(function (p) { byId[p.id] = p; });
 
-  // „Препоръчани“: редуваме марките, за да не започва списъкът с една марка
+  // „Препоръчани“: първо featured, после марките се редуват
   var recommended = (function () {
-    var byBrand = {}, order = [];
-    DATA.products.forEach(function (p) {
+    var featured = DATA.products.filter(function (p) { return p.featured; });
+    var byBrand = {}, order = [], rest = DATA.products.filter(function (p) { return !p.featured; });
+    rest.forEach(function (p) {
       if (!byBrand[p.brand]) { byBrand[p.brand] = []; order.push(p.brand); }
       byBrand[p.brand].push(p);
     });
-    var out = [];
+    var out = featured.slice();
     while (out.length < DATA.products.length) {
       order.forEach(function (b) { if (byBrand[b].length) out.push(byBrand[b].shift()); });
     }
     return out;
   })();
 
-  function fillSelect(el, values, label) {
-    if (!el) return;
-    el.innerHTML += values.map(function (v) {
-      return '<option value="' + esc(v) + '">' + esc(label ? label(v) : v) + "</option>";
-    }).join("");
-  }
   var uniq = function (arr) { return arr.filter(function (v, i) { return arr.indexOf(v) === i; }); };
-  fillSelect($("#brandFilter"), uniq(DATA.products.map(function (p) { return p.brand; })).sort());
-  fillSelect($("#btuFilter"), uniq(DATA.products.map(function (p) { return p.btu; })).sort(function (a, b) { return a - b; }), fmtBtu);
+  var TYPES = ["wall", "floor", "multi", "cassette", "duct", "column", "mobile"].filter(function (tp) {
+    return DATA.products.some(function (p) { return p.type === tp; });
+  });
 
-  var usedTypes = DATA.products.reduce(function (acc, p) {
-    if (acc.indexOf(p.type) < 0) acc.push(p.type);
-    return acc;
-  }, []);
-
-  if (chips) {
-    var chipHtml = '<button class="chip is-active" data-type="">Всички</button>';
-    usedTypes.forEach(function (t) {
-      chipHtml += '<button class="chip" data-type="' + esc(t) + '">' + esc(DATA.productTypes[t] || t) + "</button>";
-    });
-    chips.innerHTML = chipHtml;
-    chips.addEventListener("click", function (e) {
-      var b = e.target.closest(".chip");
-      if (!b) return;
-      chips.querySelectorAll(".chip").forEach(function (c) { c.classList.remove("is-active"); });
-      b.classList.add("is-active");
-      state.type = b.dataset.type;
-      state.limit = PAGE;
-      renderProducts();
-    });
+  function renderFilters() {
+    var chips = $("#typeChips");
+    if (chips) {
+      chips.innerHTML = [""].concat(TYPES).map(function (tp) {
+        return '<button type="button" class="chip' + (state.type === tp ? " is-active" : "") + '" data-type="' + tp + '">' +
+          (tp ? t("type." + tp) : t("catalog.all")) + "</button>";
+      }).join("");
+    }
+    var fill = function (el, first, values, label) {
+      if (!el) return;
+      var cur = el.value;
+      el.innerHTML = '<option value="">' + first + "</option>" + values.map(function (v) {
+        return '<option value="' + esc(v) + '">' + esc(label ? label(v) : v) + "</option>";
+      }).join("");
+      el.value = cur;
+    };
+    fill($("#brandFilter"), t("catalog.allBrands"), uniq(DATA.products.map(function (p) { return p.brand; })).sort());
+    fill($("#btuFilter"), t("catalog.anyBtu"), uniq(DATA.products.map(function (p) { return p.btu; })).sort(function (a, b) { return a - b; }), fmtBtu);
   }
 
-  function badgeClass(b) {
-    var k = b.toLowerCase();
-    if (k.indexOf("промо") > -1) return "badge--red";
-    if (k.indexOf("монтаж") > -1) return "badge--green";
-    if (k.indexOf("ново") > -1 || k.indexOf("хипер") > -1) return "badge--blue";
-    if (k.indexOf("a+++") > -1) return "badge--green";
-    return "badge--gold";
+  $("#typeChips").addEventListener("click", function (e) {
+    var b = e.target.closest(".chip");
+    if (!b) return;
+    state.type = b.dataset.type;
+    state.limit = PAGE;
+    $$(".chip", this).forEach(function (c) { c.classList.toggle("is-active", c === b); });
+    renderProducts();
+  });
+
+  function badgeHtml(b) {
+    var key = "badge." + b, known = !!I18N.T[key];
+    var cls = { leader: "badge--gold", hyper: "badge--blue", "new": "badge--red", install: "badge--green" }[b] || "badge--gold";
+    return '<span class="badge ' + cls + '">' + esc(known ? t(key) : b) + "</span>";
+  }
+
+  function priceHtml(p) {
+    return p.price != null
+      ? "<small>" + t("price.label") + "</small><b>" + fmtPrice(p.price) + "</b>"
+      : '<small>&nbsp;</small><b class="product__ask">' + t("price.ask") + "</b>";
   }
 
   function productCard(p) {
     var img = p.image
-      ? '<img src="' + esc(p.image) + '" alt="' + esc(p.brand + " " + p.name) + '" loading="lazy">'
-      : '<div class="product__placeholder">' + svg("snow") + "<span>Снимка скоро</span></div>";
-    var badges = (p.badges || []).map(function (b) {
-      return '<span class="badge ' + badgeClass(b) + '">' + esc(b) + "</span>";
-    }).join("");
-    var price = p.price != null
-      ? (p.oldPrice ? '<s>' + fmtPrice(p.oldPrice) + "</s>" : "") + "<b>" + fmtPrice(p.price) + "</b>"
-      : '<b class="product__ask">Цена при запитване</b>';
-
-    return '<article class="product reveal is-visible">' +
-      '<button class="product__media" data-open="' + esc(p.id) + '" aria-label="Детайли за ' + esc(p.name) + '">' +
-        img + '<div class="product__badges">' + badges + "</div>" +
+      ? '<img src="' + esc(p.image) + '" alt="' + esc(p.name) + '" loading="lazy" width="400" height="300">'
+      : '<div class="product__placeholder">' + svg("snow") + "<span>" + t("photoSoon") + "</span></div>";
+    return '<article class="product' + (p.featured ? " product--featured" : "") + '">' +
+      '<button type="button" class="product__media" data-open="' + esc(p.id) + '" aria-label="' + t("btn.details") + ": " + esc(p.name) + '">' +
+        img + '<div class="product__badges">' + (p.badges || []).slice(0, 2).map(badgeHtml).join("") + "</div>" +
         '<span class="product__energy">' + esc(p.energy) + "</span>" +
       "</button>" +
       '<div class="product__body">' +
-        '<span class="product__brand">' + esc(p.brand) + " · " + esc(DATA.productTypes[p.type] || "") + "</span>" +
-        '<h3 class="product__name">' + esc(p.name) + "</h3>" +
+        '<span class="product__brand">' + esc(p.brand) + " · " + t("type." + p.type) + "</span>" +
+        '<h3 class="product__name"><button type="button" data-open="' + esc(p.id) + '">' + esc(p.name) + "</button></h3>" +
         '<ul class="product__specs">' +
-          "<li><small>Мощност</small>" + fmtBtu(p.btu) + "</li>" +
-          "<li><small>Площ</small>" + esc(p.area) + "</li>" +
-          "<li><small>Wi-Fi</small>" + (p.wifi ? "Да" : "Не") + "</li>" +
+          "<li><small>" + t("spec.power") + "</small>" + fmtBtu(p.btu) + "</li>" +
+          "<li><small>" + t("spec.area") + "</small>" + esc(areaText(p)) + "</li>" +
+          "<li><small>Wi-Fi</small>" + (p.wifi ? t("yes") : t("no")) + "</li>" +
         "</ul>" +
         '<div class="product__foot">' +
-          '<div class="product__price">' + price + "</div>" +
+          '<div class="product__price">' + priceHtml(p) + "</div>" +
           '<div class="product__btns">' +
-            '<button class="btn btn--outline btn--sm" data-open="' + esc(p.id) + '">Детайли</button>' +
-            '<a class="btn btn--green btn--sm" target="_blank" rel="noopener" href="' + waLink(p) + '">Запитване</a>' +
+            '<button type="button" class="btn btn--green btn--sm" data-lead="price" data-model="' + esc(p.name) + '">' + t("btn.price") + "</button>" +
+            '<button type="button" class="btn btn--outline btn--sm" data-lead="consult" data-model="' + esc(p.name) + '">' + t("btn.consult") + "</button>" +
           "</div>" +
         "</div>" +
       "</div>" +
     "</article>";
   }
 
-  function waLink(p) {
-    var msg = "Здравейте! Интересувам се от: " + p.brand + " " + p.name + " (" + fmtBtu(p.btu) + ").";
-    return "https://wa.me/" + PHONE_WA + "?text=" + encodeURIComponent(msg);
-  }
-
   function renderProducts() {
+    var grid = $("#productsGrid");
     if (!grid) return;
     var q = state.q.trim().toLowerCase();
     var list = recommended.filter(function (p) {
@@ -162,149 +194,197 @@
     if (state.sort === "btu") list.sort(function (a, b) { return a.btu - b.btu; });
 
     grid.innerHTML = list.slice(0, state.limit).map(productCard).join("");
-    empty.hidden = list.length > 0;
-    moreBtn.hidden = list.length <= state.limit;
-    moreBtn.textContent = "Покажи още (" + (list.length - state.limit) + ")";
-    countEl.textContent = list.length ? "Намерени модели: " + list.length : "";
+    $("#productsEmpty").hidden = list.length > 0;
+    var more = $("#showMore");
+    more.hidden = list.length <= state.limit;
+    more.textContent = t("catalog.more") + " (" + Math.max(0, list.length - state.limit) + ")";
+    $("#productsCount").textContent = list.length ? t("catalog.found") + list.length : "";
   }
 
-  var searchEl = $("#search"), btuEl = $("#btuFilter"), sortEl = $("#sort"), brandEl = $("#brandFilter");
-  var onFilter = function (key, el, ev) {
+  var bindFilter = function (key, el, ev) {
     if (el) el.addEventListener(ev, function () { state[key] = el.value; state.limit = PAGE; renderProducts(); });
   };
-  onFilter("q", searchEl, "input");
-  onFilter("btu", btuEl, "change");
-  onFilter("brand", brandEl, "change");
-  onFilter("sort", sortEl, "change");
-  if (moreBtn) moreBtn.addEventListener("click", function () { state.limit += PAGE; renderProducts(); });
-  renderProducts();
+  bindFilter("q", $("#search"), "input");
+  bindFilter("btu", $("#btuFilter"), "change");
+  bindFilter("brand", $("#brandFilter"), "change");
+  bindFilter("sort", $("#sort"), "change");
+  $("#showMore").addEventListener("click", function () { state.limit += PAGE; renderProducts(); });
 
-  /* ---------- Product modal ---------- */
-  var modal = $("#productModal"), modalBody = $("#modalBody");
+  /* ---------- Dialogs ---------- */
+  function openDialog(d) {
+    if (!d) return;
+    if (typeof d.showModal === "function") d.showModal(); else d.setAttribute("open", "");
+  }
+  $$("dialog").forEach(function (d) {
+    d.addEventListener("click", function (e) {
+      if (e.target === d || e.target.closest("[data-close]")) d.close();
+    });
+  });
 
+  /* ---------- Product details ---------- */
+  var productModal = $("#productModal");
   function openProduct(id) {
-    var p = DATA.products.filter(function (x) { return x.id === id; })[0];
-    if (!p || !modal) return;
-    var img = p.image
-      ? '<img src="' + esc(p.image) + '" alt="">'
-      : '<div class="product__placeholder">' + svg("snow") + "</div>";
-    var feats = (p.features || []).map(function (f) { return "<li>" + esc(f) + "</li>"; }).join("");
-    var price = p.price != null
-      ? (p.oldPrice ? "<s>" + fmtPrice(p.oldPrice) + "</s> " : "") + "<b>" + fmtPrice(p.price) + "</b>"
-      : "<b>Цена при запитване</b>";
-    modalBody.innerHTML =
+    var p = byId[id];
+    if (!p) return;
+    var s = p.specs || {};
+    var img = p.image ? '<img src="' + esc(p.image) + '" alt="' + esc(p.name) + '">' : '<div class="product__placeholder">' + svg("snow") + "</div>";
+    var rows = [
+      [t("spec.power"), fmtBtu(p.btu)],
+      [t("spec.areaLong"), areaText(p)],
+      [t("spec.energy"), p.energy + (s.scopClass ? " / " + s.scopClass : "")],
+      [t("spec.wifi"), p.wifi ? t("yes") : t("no")]
+    ];
+    if (s.refrigerant) rows.push([t("spec.refrigerant"), s.refrigerant]);
+    if (s.noise) rows.push([t("spec.noise"), s.noise + " dB"]);
+    if (s.heatMin != null) rows.push([t("spec.heat"), s.heatMin + "°C"]);
+    if (s.seer) rows.push([t("spec.seer"), s.seer + (s.scop ? " / " + s.scop : "")]);
+    if (s.warranty) rows.push([t("spec.warranty"), s.warranty + " " + t("unit.months")]);
+    var desc = p.description ? L(p.description) : I18N.describe(p, lang);
+
+    $("#modalBody").innerHTML =
       '<div class="modal__media">' + img + "</div>" +
       '<div class="modal__info">' +
-        '<span class="product__brand">' + esc(p.brand) + " · " + esc(DATA.productTypes[p.type] || "") + "</span>" +
+        '<div class="product__badges product__badges--inline">' + (p.badges || []).map(badgeHtml).join("") + "</div>" +
+        '<span class="product__brand">' + esc(p.brand) + " · " + t("type." + p.type) + "</span>" +
         '<h3 id="modalTitle">' + esc(p.name) + "</h3>" +
-        '<table class="spec-table">' +
-          "<tr><th>Мощност</th><td>" + fmtBtu(p.btu) + "</td></tr>" +
-          "<tr><th>Препоръчана площ</th><td>" + esc(p.area) + "</td></tr>" +
-          "<tr><th>Енергиен клас</th><td>" + esc(p.energy) + "</td></tr>" +
-          "<tr><th>Wi-Fi управление</th><td>" + (p.wifi ? "Да" : "Не") + "</td></tr>" +
-        "</table>" +
-        (p.description ? '<p class="modal__desc">' + esc(p.description) + "</p>" : "") +
-        (feats ? '<ul class="checklist">' + feats + "</ul>" : "") +
-        '<div class="modal__price">' + price + "</div>" +
+        '<table class="spec-table">' + rows.map(function (r) { return "<tr><th>" + esc(r[0]) + "</th><td>" + esc(r[1]) + "</td></tr>"; }).join("") + "</table>" +
+        '<p class="modal__desc">' + esc(desc) + "</p>" +
+        '<div class="modal__price product__price">' + priceHtml(p) + "</div>" +
         '<div class="form-actions">' +
-          '<a class="btn btn--green" target="_blank" rel="noopener" href="' + waLink(p) + '">Запитване в WhatsApp</a>' +
-          '<a class="btn btn--outline" href="tel:+359886086029">Обадете се</a>' +
+          '<button type="button" class="btn btn--green" data-lead="price" data-model="' + esc(p.name) + '">' + t("btn.price") + "</button>" +
+          '<button type="button" class="btn btn--outline" data-lead="consult" data-model="' + esc(p.name) + '">' + t("btn.consultLong") + "</button>" +
         "</div>" +
+        '<p class="modal__note">' + t("catalog.note") + "</p>" +
       "</div>";
-    modal.showModal();
+    openDialog(productModal);
+  }
+
+  /* ---------- Request form (price / consultation) ---------- */
+  var leadModal = $("#leadModal"), leadForm = $("#leadForm");
+  function openLead(type, model) {
+    leadForm.elements.type.value = type === "price" ? "price" : "consult";
+    leadForm.elements.model.value = model || "";
+    $(".lead-form__model", leadForm).hidden = !model;
+    $("#leadTitle").textContent = t(type === "price" ? "lead.title.price" : "lead.title.consult");
+    $(".form-error", leadForm).hidden = true;
+    if (productModal.open) productModal.close();
+    openDialog(leadModal);
+    setTimeout(function () { leadForm.elements.name.focus(); }, 50);
   }
 
   document.addEventListener("click", function (e) {
-    var t = e.target.closest("[data-open]");
-    if (t) openProduct(t.dataset.open);
+    var o = e.target.closest("[data-open]");
+    if (o) { openProduct(o.dataset.open); return; }
+    var l = e.target.closest("[data-lead]");
+    if (l) openLead(l.dataset.lead, l.dataset.model);
   });
-  if (modal) {
-    $("#modalClose").addEventListener("click", function () { modal.close(); });
-    modal.addEventListener("click", function (e) { if (e.target === modal) modal.close(); });
+
+  function sendForm(form, via) {
+    var f = form.elements;
+    var name = (f.name.value || "").trim(), phone = (f.phone.value || "").trim();
+    var err = $(".form-error", form);
+    if (!name || !phone) { err.hidden = false; (name ? f.phone : f.name).focus(); return; }
+    err.hidden = true;
+    var lines = [t("msg.hello")];
+    if (f.type) lines.push(t("form.type") + ": " + t("form.type." + f.type.value));
+    if (f.model && f.model.value) lines.push(t("form.model") + ": " + f.model.value);
+    lines.push(t("form.name") + ": " + name, t("form.phone") + ": " + phone);
+    if (f.town && f.town.value) lines.push(t("form.town") + ": " + f.town.value);
+    if (f.service && f.service.value) lines.push(t("form.service") + ": " + f.service.value);
+    if (f.message && f.message.value.trim()) lines.push(t("form.msg") + ": " + f.message.value.trim());
+    var text = lines.join("\n");
+    if (via === "mail") {
+      location.href = "mailto:" + EMAIL + "?subject=" + encodeURIComponent(t("msg.subject") + " – " + name) + "&body=" + encodeURIComponent(text);
+    } else {
+      window.open("https://wa.me/" + PHONE_WA + "?text=" + encodeURIComponent(text), "_blank", "noopener");
+    }
+  }
+  $$(".lead-form").forEach(function (form) {
+    var via = "wa";
+    $$("[data-via]", form).forEach(function (b) { b.addEventListener("click", function () { via = b.dataset.via; }); });
+    form.addEventListener("submit", function (e) { e.preventDefault(); sendForm(form, via); });
+  });
+
+  function renderFormSelects() {
+    $$(".js-towns").forEach(function (el) {
+      var cur = el.value;
+      el.innerHTML = '<option value="">' + t("form.choose") + "</option>" + DATA.towns.map(function (tw) {
+        return '<option value="' + esc(tw) + '">' + esc(I18N.town(tw, lang)) + "</option>";
+      }).join("") + '<option value="' + t("form.other") + '">' + t("form.other") + "</option>";
+      el.value = cur;
+    });
+    $$(".js-services").forEach(function (el) {
+      var cur = el.selectedIndex;
+      el.innerHTML = '<option value="">' + t("form.choose") + "</option>" + DATA.services.map(function (s) {
+        return "<option>" + esc(L(s.title)) + "</option>";
+      }).join("") + "<option>" + t("form.buyAc") + "</option>";
+      el.selectedIndex = Math.max(0, cur);
+    });
   }
 
   /* ---------- Calculator ---------- */
-  var cLen = $("#cLen"), cWid = $("#cWid"), cHei = $("#cHei"), cSun = $("#cSun"), cPeople = $("#cPeople");
   var STANDARD = [9000, 12000, 18000, 24000];
   var recBtu = 9000;
-
   function calc() {
-    if (!cLen) return;
-    var area = Math.max(0, parseFloat(cLen.value) || 0) * Math.max(0, parseFloat(cWid.value) || 0);
-    var h = parseFloat(cHei.value) || 2.7;
-    var watts = area * 100 * (h / 2.7);
-    if (cSun.checked) watts *= 1.15;
-    if (cPeople.checked) watts *= 1.1;
-    var btu = watts * 3.412;
-    recBtu = STANDARD.filter(function (s) { return s >= btu; })[0] || 0;
-    $("#rArea").textContent = (Math.round(area * 10) / 10).toLocaleString("bg-BG") + " м²";
-    $("#rBtu").textContent = recBtu ? fmtBtu(recBtu) : "над 24 000 BTU";
+    var v = function (id) { return Math.max(0, parseFloat($(id).value) || 0); };
+    var area = v("#cLen") * v("#cWid");
+    var watts = area * 100 * ((parseFloat($("#cHei").value) || 2.7) / 2.7);
+    if ($("#cSun").checked) watts *= 1.15;
+    if ($("#cPeople").checked) watts *= 1.1;
+    recBtu = STANDARD.filter(function (s) { return s >= watts * 3.412; })[0] || 0;
+    $("#rArea").textContent = (Math.round(area * 10) / 10).toLocaleString("bg-BG") + (lang === "en" ? " m²" : " м²");
+    $("#rBtu").textContent = recBtu ? fmtBtu(recBtu) : t("calc.over");
   }
-  ["input", "change"].forEach(function (ev) {
-    var f = $("#calcForm");
-    if (f) f.addEventListener(ev, calc);
-  });
-  calc();
-
-  var calcShow = $("#calcShow");
-  if (calcShow) calcShow.addEventListener("click", function () {
+  ["input", "change"].forEach(function (ev) { $("#calcForm").addEventListener(ev, calc); });
+  $("#calcShow").addEventListener("click", function () {
     state.btu = recBtu ? String(recBtu) : "";
-    btuEl.value = state.btu;
+    $("#btuFilter").value = state.btu;
     state.limit = PAGE;
     renderProducts();
     $("#catalog").scrollIntoView({ behavior: "smooth" });
   });
 
-  /* ---------- Towns ---------- */
-  var towns = $("#towns"), townSelect = $("#townSelect"), serviceSelect = $("#serviceSelect");
-  if (towns) towns.innerHTML = DATA.towns.map(function (t) {
-    return '<li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg>' + esc(t) + "</li>";
-  }).join("");
-  if (townSelect) townSelect.innerHTML += DATA.towns.map(function (t) {
-    return '<option>' + esc(t) + "</option>";
-  }).join("") + "<option>Друго</option>";
-  if (serviceSelect) serviceSelect.innerHTML += DATA.services.map(function (s) {
-    return "<option>" + esc(s.title) + "</option>";
-  }).join("") + "<option>Покупка на климатик</option>";
-
-  document.addEventListener("click", function (e) {
-    var l = e.target.closest("[data-service]");
-    if (l && serviceSelect) serviceSelect.value = l.dataset.service;
+  /* ---------- Gallery ---------- */
+  var gallery = DATA.gallery || [];
+  function renderGallery() {
+    var grid = $("#galleryGrid");
+    $("#galleryEmpty").hidden = gallery.length > 0;
+    grid.hidden = !gallery.length;
+    grid.innerHTML = gallery.map(function (g, i) {
+      var title = L(g.title), place = g.place ? I18N.town(g.place, lang) : "";
+      return '<button type="button" class="gallery__item" data-gallery="' + i + '">' +
+        '<img src="' + esc(g.image) + '" alt="' + esc(title + (place ? " – " + place : "")) + '" loading="lazy">' +
+        '<span class="gallery__cap"><b>' + esc(title) + "</b>" + (place ? "<small>" + esc(place) + "</small>" : "") + "</span>" +
+        '<span class="gallery__zoom">' + svg("zoom") + "</span>" +
+      "</button>";
+    }).join("");
+  }
+  $("#galleryGrid").addEventListener("click", function (e) {
+    var b = e.target.closest("[data-gallery]");
+    if (!b) return;
+    var g = gallery[+b.dataset.gallery];
+    $("#lightboxImg").src = g.image;
+    $("#lightboxImg").alt = L(g.title);
+    $("#lightboxCap").textContent = L(g.title) + (g.place ? " · " + I18N.town(g.place, lang) : "");
+    openDialog($("#lightbox"));
   });
 
-  /* ---------- Contact form ---------- */
-  var form = $("#contactForm");
-  if (form) {
-    var via = "wa";
-    form.querySelectorAll("[data-via]").forEach(function (b) {
-      b.addEventListener("click", function () { via = b.dataset.via; });
-    });
-    form.addEventListener("submit", function (e) {
-      e.preventDefault();
-      var fd = new FormData(form);
-      var name = (fd.get("name") || "").trim(), phone = (fd.get("phone") || "").trim();
-      var err = $("#formError");
-      if (!name || !phone) {
-        err.hidden = false;
-        form.elements[name ? "phone" : "name"].focus();
-        return;
-      }
-      err.hidden = true;
-      var lines = [
-        "Здравейте! Запитване от сайта:",
-        "Име: " + name,
-        "Телефон: " + phone
-      ];
-      if (fd.get("town")) lines.push("Населено място: " + fd.get("town"));
-      if (fd.get("service")) lines.push("Услуга: " + fd.get("service"));
-      if ((fd.get("message") || "").trim()) lines.push("Съобщение: " + fd.get("message").trim());
-      var text = lines.join("\n");
-      if (via === "mail") {
-        location.href = "mailto:" + EMAIL + "?subject=" + encodeURIComponent("Запитване от сайта – " + name) + "&body=" + encodeURIComponent(text);
-      } else {
-        window.open("https://wa.me/" + PHONE_WA + "?text=" + encodeURIComponent(text), "_blank", "noopener");
-      }
-    });
+  /* ---------- Towns ---------- */
+  function renderTowns() {
+    $("#towns").innerHTML = DATA.towns.map(function (tw) {
+      return '<li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg>' + esc(I18N.town(tw, lang)) + "</li>";
+    }).join("");
+  }
+
+  function renderAll() {
+    renderServices();
+    renderFilters();
+    renderProducts();
+    renderFormSelects();
+    renderGallery();
+    renderTowns();
+    calc();
+    if (productModal.open) productModal.close();
   }
 
   /* ---------- Header / nav ---------- */
@@ -324,8 +404,12 @@
   nav.addEventListener("click", function (e) { if (e.target.closest("a")) setMenu(false); });
   document.addEventListener("keydown", function (e) { if (e.key === "Escape") setMenu(false); });
 
+  /* ---------- Init ---------- */
+  applyStatic();
+  renderAll();
+
   /* ---------- Reveal on scroll ---------- */
-  var els = document.querySelectorAll(".reveal:not(.is-visible)");
+  var els = $$(".reveal:not(.is-visible)");
   if ("IntersectionObserver" in window) {
     var io = new IntersectionObserver(function (entries) {
       entries.forEach(function (en) {
@@ -337,6 +421,5 @@
     els.forEach(function (el) { el.classList.add("is-visible"); });
   }
 
-  var y = $("#year");
-  if (y) y.textContent = new Date().getFullYear();
+  $("#year").textContent = new Date().getFullYear();
 })();
