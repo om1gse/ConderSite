@@ -28,7 +28,6 @@
   var t = function (key) { var e = I18N.T[key]; return e ? (e[lang] || e.bg) : key; };
   var L = function (v) { return v && typeof v === "object" ? (v[lang] || v.bg || "") : (v || ""); };
   var fmtBtu = function (n) { return Number(n).toLocaleString("bg-BG").replace(/\s/g, " ") + " BTU"; };
-  var fmtPrice = function (n) { return Number(n).toLocaleString("bg-BG", { maximumFractionDigits: 2 }).replace(/\s/g, " ") + " €"; };
   var areaText = function (p) { return typeof p.area === "number" ? t("unit.area").replace("{n}", p.area) : L(p.area); };
 
   function applyStatic() {
@@ -77,7 +76,7 @@
         '<div class="service__ico">' + svg(s.icon) + "</div>" +
         "<h3>" + esc(L(s.title)) + "</h3>" +
         "<p>" + esc(L(s.text)) + "</p>" +
-        '<div class="service__foot"><span class="service__price">' + esc(L(s.price)) + "</span>" +
+        '<div class="service__foot"><span class="service__price">' + t("price.ask") + "</span>" +
         '<button type="button" class="service__link" data-lead="consult" data-model="' + esc(L(s.title)) + '">' + t("services.request") + " &rarr;</button></div>" +
         "</article>";
     }).join("");
@@ -143,10 +142,9 @@
     return '<span class="badge ' + cls + '">' + esc(known ? t(key) : b) + "</span>";
   }
 
-  function priceHtml(p) {
-    return p.price != null
-      ? "<small>" + t("price.label") + "</small><b>" + fmtPrice(p.price) + "</b>"
-      : '<small>&nbsp;</small><b class="product__ask">' + t("price.ask") + "</b>";
+  /* Prices are not published: every model is "price on request". */
+  function priceHtml() {
+    return '<small>' + t("price.label") + '</small><b class="product__ask">' + t("price.ask") + "</b>";
   }
 
   function productCard(p) {
@@ -156,7 +154,7 @@
     return '<article class="product' + (p.featured ? " product--featured" : "") + '">' +
       '<button type="button" class="product__media" data-open="' + esc(p.id) + '" aria-label="' + t("btn.details") + ": " + esc(p.name) + '">' +
         img + '<div class="product__badges">' + (p.badges || []).slice(0, 2).map(badgeHtml).join("") + "</div>" +
-        '<span class="product__energy">' + esc(p.energy) + "</span>" +
+        (p.energy ? '<span class="product__energy">' + esc(p.energy) + "</span>" : "") +
       "</button>" +
       '<div class="product__body">' +
         '<span class="product__brand">' + esc(p.brand) + " · " + t("type." + p.type) + "</span>" +
@@ -188,9 +186,6 @@
       if (q && (p.brand + " " + p.name).toLowerCase().indexOf(q) < 0) return false;
       return true;
     });
-    var priceOf = function (p) { return p.price == null ? Infinity : p.price; };
-    if (state.sort === "price-asc") list.sort(function (a, b) { return priceOf(a) - priceOf(b); });
-    if (state.sort === "price-desc") list.sort(function (a, b) { return (b.price || 0) - (a.price || 0); });
     if (state.sort === "btu") list.sort(function (a, b) { return a.btu - b.btu; });
 
     grid.innerHTML = list.slice(0, state.limit).map(productCard).join("");
@@ -231,9 +226,9 @@
     var rows = [
       [t("spec.power"), fmtBtu(p.btu)],
       [t("spec.areaLong"), areaText(p)],
-      [t("spec.energy"), p.energy + (s.scopClass ? " / " + s.scopClass : "")],
       [t("spec.wifi"), p.wifi ? t("yes") : t("no")]
     ];
+    if (p.energy) rows.splice(2, 0, [t("spec.energy"), p.energy + (s.scopClass ? " / " + s.scopClass : "")]);
     if (s.refrigerant) rows.push([t("spec.refrigerant"), s.refrigerant]);
     if (s.noise) rows.push([t("spec.noise"), s.noise + " dB"]);
     if (s.heatMin != null) rows.push([t("spec.heat"), s.heatMin + "°C"]);

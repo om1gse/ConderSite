@@ -36,6 +36,8 @@ html { overflow-x: clip; scroll-behavior: smooth; scroll-padding-top: calc(var(-
 body {
   margin: 0;
   font-family: var(--ff-body);
+  /* lang="bg" switches fonts to Bulgarian glyph forms; keep one look for every language */
+  font-feature-settings: "locl" 0;
   font-size: 16px;
   line-height: 1.6;
   color: var(--ink);

@@ -81,9 +81,9 @@
       ru: "По этим критериям моделей не найдено. <a href=\"#contacts\">Спросите нас</a> – подберём подходящую."
     },
     "catalog.note": {
-      bg: "Цените са ориентировъчни и не представляват търговско предложение. Окончателната цена с монтаж се договаря след консултация.",
-      en: "Prices are indicative and do not constitute a commercial offer. The final price including installation is agreed after a consultation.",
-      ru: "Цены ориентировочные и не являются коммерческим предложением. Окончательная цена с монтажом согласуется после консультации."
+      bg: "Цените се договарят индивидуално след консултация – според модела, обекта и монтажа. Изпратете запитване и ще ви направим оферта.",
+      en: "Prices are agreed individually after a consultation, depending on the model, the site and the installation. Send a request and we will prepare a quote.",
+      ru: "Цены согласовываются индивидуально после консультации – в зависимости от модели, объекта и монтажа. Отправьте запрос, и мы подготовим предложение."
     },
     "sort.default": { bg: "Препоръчани", en: "Recommended", ru: "Рекомендуемые" },
     "sort.priceAsc": { bg: "Цена: възходяща", en: "Price: low to high", ru: "Цена: по возрастанию" },
@@ -105,8 +105,8 @@
     "yes": { bg: "Да", en: "Yes", ru: "Да" },
     "no": { bg: "Не", en: "No", ru: "Нет" },
 
-    "price.ask": { bg: "Цена при запитване", en: "Price on request", ru: "Цена по запросу" },
-    "price.label": { bg: "Ориентировъчна цена", en: "Indicative price", ru: "Ориентировочная цена" },
+    "price.ask": { bg: "По договаряне", en: "Negotiable", ru: "По договорённости" },
+    "price.label": { bg: "Цена", en: "Price", ru: "Цена" },
     "btn.price": { bg: "Запитване за цена", en: "Request price", ru: "Запросить цену" },
     "btn.consult": { bg: "Консултация", en: "Consultation", ru: "Консультация" },
     "btn.consultLong": { bg: "Заявка за консултация", en: "Request a consultation", ru: "Заказать консультацию" },
@@ -291,9 +291,9 @@
     /* ---- Footer ---- */
     "footer.rights": { bg: "Всички права запазени.", en: "All rights reserved.", ru: "Все права защищены." },
     "footer.note": {
-      bg: "Сайтът е каталог на климатична техника и услуги. Цените са ориентировъчни и не представляват търговско предложение. Онлайн продажби и плащания не се извършват.",
-      en: "This website is a catalog of climate equipment and services. Prices are indicative and do not constitute a commercial offer. No online sales or payments are made.",
-      ru: "Сайт является каталогом климатической техники и услуг. Цены ориентировочные и не являются коммерческим предложением. Онлайн-продажи и оплата не производятся."
+      bg: "Сайтът е каталог на климатична техника и услуги. Цените се договарят индивидуално. Онлайн продажби и плащания не се извършват.",
+      en: "This website is a catalog of climate equipment and services. Prices are agreed individually. No online sales or payments are made.",
+      ru: "Сайт является каталогом климатической техники и услуг. Цены согласовываются индивидуально. Онлайн-продажи и оплата не производятся."
     }
   };
 
